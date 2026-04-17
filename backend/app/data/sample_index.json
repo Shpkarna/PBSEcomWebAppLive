@@ -1,0 +1,29 @@
+{
+  "categories": [],
+  "vendors": [],
+  "users": [],
+  "products": [],
+  "orders": [
+    "69d7429c1141731aabf1a579"
+  ],
+  "cart": [
+    "69d7429c1141731aabf1a57a",
+    "69d7429c1141731aabf1a57b"
+  ],
+  "saved_products": [
+    "69d7429c1141731aabf1a57c"
+  ],
+  "stock_ledger": [
+    "69d7429c1141731aabf1a57d",
+    "69d7429c1141731aabf1a57e",
+    "69d7429c1141731aabf1a57f"
+  ],
+  "ledger": [
+    "69d7429c1141731aabf1a580"
+  ],
+  "contact_inquiries": [
+    "69d7429c1141731aabf1a581"
+  ],
+  "user_role_mappings": [],
+  "role_functionality_mappings": []
+}

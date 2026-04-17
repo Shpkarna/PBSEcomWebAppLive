@@ -1,0 +1,6 @@
+**
+!frontend/
+!frontend/**
+!deployment/nginx.conf
+test_suit/
+test_suit/**

@@ -1,0 +1,78 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: econsite-mongo
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-rootpassword}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-ecomdb}
+      MONGO_APP_DATABASE: ${MONGO_DATABASE:-ecomdb}
+      MONGO_LOG_DATABASE: ${MONGO_LOG_DATABASE:-logDB}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:-ecom_app}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-ecom_password}
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u $${MONGO_INITDB_ROOT_USERNAME} -p $${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deployment/backend.Dockerfile
+    container_name: econsite-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      PORT: ${BACKEND_INTERNAL_PORT:-8000}
+      MONGO_URI: mongodb://${MONGO_APP_USERNAME:-ecom_app}:${MONGO_APP_PASSWORD:-ecom_password}@mongo:27017/${MONGO_DATABASE:-ecomdb}?authSource=admin
+      mongodb_url: mongodb://${MONGO_APP_USERNAME:-ecom_app}:${MONGO_APP_PASSWORD:-ecom_password}@mongo:27017/${MONGO_DATABASE:-ecomdb}?authSource=admin
+      mongodb_database: ${MONGO_DATABASE:-ecomdb}
+      log_database: ${MONGO_LOG_DATABASE:-logDB}
+      secret_key: ${SECRET_KEY:-change-this-secret-key}
+      admin_username: ${ADMIN_USERNAME:-admin}
+      admin_password: ${ADMIN_PASSWORD:-Qsrt#09-MWQ}
+      admin_email: ${ADMIN_EMAIL:-admin@paultrades.com}
+      package_option: ${PACKAGE_OPTION:-prod}
+    ports:
+      - "${BACKEND_PORT:-7999}:${BACKEND_INTERNAL_PORT:-8000}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.getenv('PORT', '8000'))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deployment/frontend.Dockerfile
+      args:
+        REACT_APP_API_URL: ${FRONTEND_API_URL:-/api}
+        PACKAGE_OPTION: ${PACKAGE_OPTION:-prod}
+    container_name: econsite-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mongo_data:
+    name: econsite_mongo_data

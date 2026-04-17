@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 140" role="img" aria-labelledby="title desc">
+  <title id="title">Hatt Brand</title>
+  <desc id="desc">Hatt stylized brand mark</desc>
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0057a3" />
+      <stop offset="100%" stop-color="#00a3d9" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="12" width="408" height="116" rx="18" fill="#ffffff" opacity="0"/>
+  <g transform="translate(20 18)">
+    <path d="M40 18c22 0 40 18 40 40S62 98 40 98 0 80 0 58 18 18 40 18zm0 18c-12 0-22 10-22 22s10 22 22 22 22-10 22-22-10-22-22-22z" fill="url(#g1)"/>
+    <path d="M31 28h18v60H31z" fill="url(#g1)"/>
+  </g>
+  <text x="122" y="86" font-family="Segoe UI, Arial, sans-serif" font-size="62" font-weight="700" fill="#0057a3">Hatt</text>
+</svg>
