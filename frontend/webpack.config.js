@@ -62,6 +62,7 @@ module.exports = (env, argv) => {
       }),
       new webpack.DefinePlugin({
         'process.env.PACKAGE_OPTION': JSON.stringify(packageOption || 'sandbox'),
+        'process.env.REACT_APP_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || '/api'),
       }),
     ],
     devServer: {
