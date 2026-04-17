@@ -14,10 +14,10 @@ const getRuntimeApiBaseUrl = () => {
   return `${protocol}//${host}:7999/api`;
 };
 
-const DEFAULT_API_BASE_URL =
-  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL)
-    ? process.env.REACT_APP_API_URL
-    : getRuntimeApiBaseUrl();
+// process.env.REACT_APP_API_URL is replaced at build time by webpack DefinePlugin.
+// eslint-disable-next-line no-undef
+const INJECTED_API_URL: string | undefined = process.env.REACT_APP_API_URL as any;
+const DEFAULT_API_BASE_URL = INJECTED_API_URL || getRuntimeApiBaseUrl();
 
 const LOCAL_API_FALLBACKS: Record<string, string> = {
   'http://localhost:7999/api': 'http://localhost:8000/api',
