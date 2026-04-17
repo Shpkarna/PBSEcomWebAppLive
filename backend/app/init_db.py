@@ -62,6 +62,9 @@ def _ensure_indexes(db):
     db["users"].create_index("customer_id", unique=True, sparse=True, background=True)
     db["products"].create_index("sku", unique=True, background=True)
     db["products"].create_index("barcode", background=True)
+    db["products"].create_index("created_at", background=True)
+    db["products"].create_index("name", background=True)
+    db["products"].create_index("sell_price", background=True)
     db["categories"].create_index("name", unique=True, background=True)
     db["vendors"].create_index("email", unique=True, sparse=True, background=True)
     db["orders"].create_index([("customer_id", ASCENDING), ("created_at", ASCENDING)], background=True)
@@ -79,6 +82,10 @@ def _ensure_indexes(db):
     )
     db["company_assets"].create_index("asset_key", unique=True, background=True)
     db["product_media"].create_index([("product_id", ASCENDING), ("created_at", ASCENDING)], background=True)
+    db["contact_inquiries"].create_index("created_at", background=True)
+    db["ledger"].create_index("created_at", background=True)
+    db["data_sync_jobs"].create_index("created_at", background=True)
+    db["stock_ledger"].create_index("created_at", background=True)
 
 
 def _create_admin_user(db):
@@ -131,6 +138,7 @@ def _ensure_logdb(client):
             logdb.create_collection(LOG_COLLECTION)
 
     # We enforce insert-only for logs by application policy; no update/delete endpoints provided.
+    logdb[LOG_COLLECTION].create_index("created_at", background=True)
     return logdb[LOG_COLLECTION]
 
 
