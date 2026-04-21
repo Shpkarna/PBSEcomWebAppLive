@@ -27,14 +27,33 @@ const shouldPreferDirectLocalApi =
   typeof window !== 'undefined' &&
   INJECTED_API_URL === '/api' &&
   isLocalHostname(window.location.hostname);
+const enableLocalPortFallback =
+  typeof window !== 'undefined' &&
+  isLocalHostname(window.location.hostname);
 const DEFAULT_API_BASE_URL = shouldPreferDirectLocalApi
   ? runtimeApiBaseUrl
   : (INJECTED_API_URL || runtimeApiBaseUrl);
 
-const LOCAL_API_FALLBACKS: Record<string, string> = {
-  '/api': runtimeApiBaseUrl,
-  'http://localhost:7999/api': 'http://localhost:8000/api',
-  'http://localhost:8000/api': 'http://localhost:7999/api',
+const getLocalApiFallback = (baseUrl: string): string | null => {
+  if (!enableLocalPortFallback || !baseUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(baseUrl);
+    if (url.port === '7999') {
+      url.port = '8000';
+      return url.toString().replace(/\/$/, '');
+    }
+    if (url.port === '8000') {
+      url.port = '7999';
+      return url.toString().replace(/\/$/, '');
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 };
 
 const api = axios.create({
@@ -82,8 +101,8 @@ api.interceptors.response.use(
     }
 
     // Local port fallback for network errors only
-    const currentBase = (cfg?.baseURL || api.defaults.baseURL || '').toLowerCase();
-    const fallbackBase = LOCAL_API_FALLBACKS[currentBase];
+    const currentBase = String(cfg?.baseURL || api.defaults.baseURL || '');
+    const fallbackBase = getLocalApiFallback(currentBase);
 
     if (!cfg || cfg._fallbackTried || !fallbackBase || error?.response) {
       return Promise.reject(error);
@@ -91,7 +110,6 @@ api.interceptors.response.use(
 
     cfg._fallbackTried = true;
     cfg.baseURL = fallbackBase;
-    api.defaults.baseURL = fallbackBase;
     return api.request(cfg);
   }
 );

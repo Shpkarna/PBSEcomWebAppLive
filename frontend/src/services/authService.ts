@@ -69,6 +69,20 @@ export interface EmailVerificationConfig {
   enable_email_verification: boolean;
 }
 
+const getStoredUser = (): User | null => {
+  const rawUser = localStorage.getItem('user');
+  if (!rawUser) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawUser) as User;
+  } catch {
+    localStorage.removeItem('user');
+    return null;
+  }
+};
+
 export const authService = {
   /** @deprecated Use sendRegistrationOTP + verifyRegistrationOTP instead */
   async register(username: string, email: string, password: string, fullName?: string, phone?: string, dob?: string) {
@@ -133,10 +147,15 @@ export const authService = {
   async getCurrentUser(): Promise<User | null> {
     try {
       const response = await api.get('/auth/me');
+      localStorage.setItem('user', JSON.stringify(response.data));
       return response.data;
-    } catch {
-      await this.logout();
-      return null;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        await this.logout();
+        return null;
+      }
+      return getStoredUser();
     }
   },
 
