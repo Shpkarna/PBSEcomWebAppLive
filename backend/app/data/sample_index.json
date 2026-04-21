@@ -1,0 +1,53 @@
+{
+  "categories": [
+    "f86be2de-9a2e-48c6-b3ec-e24b76a84ecf",
+    "e244ea4e-eb8b-45b6-b424-92354f7fc507",
+    "2759d511-f008-429f-95bf-c821c3527379",
+    "d1354912-34a9-4ebf-8e22-b7738a4dc177",
+    "4ed25ea8-7469-4930-a128-26e30ed691dc"
+  ],
+  "vendors": [
+    "e57bff1a-e7e2-481f-a96f-455c0e7754ff",
+    "4dbce4bd-2b34-404a-be56-aecc35426af5",
+    "4b4fdd51-9729-4f86-bab1-02085a0a95fe"
+  ],
+  "users": [
+    "8f448bcf-d1e4-4904-add9-1e287f1d733e",
+    "5ef0e89b-d37f-4f72-ada3-f1d6837dcfec",
+    "d0f44d1b-eee7-48ca-9a02-5866cde9aa1c"
+  ],
+  "products": [
+    "f38a3e5c-553c-4545-a3d8-01a14e8c7bad",
+    "405da360-0cb6-4e9c-b154-36a4bb71973f",
+    "0f859e6a-6817-443c-85ae-81ca0e9b8486",
+    "a43b4ed2-9ba7-41e9-b65f-7ba7f9eba2a9",
+    "6fcb9626-0942-42ef-9042-c6273dd972c3"
+  ],
+  "orders": [
+    "e2079ae7-1d45-4d1e-88bd-4da3fd71e8e9"
+  ],
+  "cart": [
+    "3421109c-7928-4d78-af27-06e22c964437",
+    "3a676e5b-ba6b-4e94-acb1-7e58161cd7eb"
+  ],
+  "saved_products": [
+    "1fd14928-f6d1-425f-ace2-f7404ec1c88e"
+  ],
+  "stock_ledger": [
+    "eecdc981-60d4-42d9-b990-1f95645d141c",
+    "cc21b9fc-88cd-474b-8b51-2384f133be42",
+    "0df44815-5f8a-4ae0-b586-822c99c32c3b"
+  ],
+  "ledger": [
+    "d6694733-15bd-4a3b-ba19-66ab0f18e48d"
+  ],
+  "contact_inquiries": [
+    "1b3dad45-2ba6-4aca-971e-8b4bccde39c1"
+  ],
+  "user_role_mappings": [
+    "47d782e3-8761-446c-a711-eb762b891e01",
+    "305e4060-a309-4ab6-9d0c-020014fd5fe6",
+    "8e48fc1d-9daf-4d28-af53-f386b744cf16"
+  ],
+  "role_functionality_mappings": []
+}

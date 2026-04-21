@@ -1,0 +1,125 @@
+# MySQL-engine production compose — no MongoDB dependency.
+#
+# Usage:
+#   docker compose -f deployment/docker-compose.mysql.yml --env-file deployment/.env.mysql up -d --build
+#
+# Or via the helper:
+#   .\deployment\docker-mysql.ps1 up
+#
+# First-time full deployment (builds, bootstraps schema, smoke tests):
+#   .\deployment\deploy_mysql.ps1
+#
+# All paths are relative to the REPOSITORY ROOT (docker compose resolves build
+# context relative to the compose file location, placing it one level up).
+
+services:
+
+  # ── MySQL 8.0 ───────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: econsite-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecomdb_phase6}
+      MYSQL_APP_USER: ${MYSQL_APP_USER:-ecom_app}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD}
+      LOG_DATABASE: ${LOG_DATABASE:-ecomdb_phase6_log}
+    ports:
+      # Default binds to loopback only (127.0.0.1:3306). Override
+      # MYSQL_EXPOSED_PORT in .env.mysql if you need a different binding.
+      - "${MYSQL_EXPOSED_PORT:-127.0.0.1:3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Init script runs once on fresh container: creates log DB + app user.
+      - ./mysql-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    healthcheck:
+      test:
+        - "CMD"
+        - "mysqladmin"
+        - "ping"
+        - "-h"
+        - "127.0.0.1"
+        - "-u"
+        - "root"
+        - "-p${MYSQL_ROOT_PASSWORD}"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ..
+      dockerfile: deployment/backend.Dockerfile
+    container_name: econsite-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Internal uvicorn port (mapped to BACKEND_PORT on the host).
+      PORT: ${BACKEND_INTERNAL_PORT:-8000}
+
+      # Engine selector — must be mysql for this compose file.
+      DB_ENGINE: mysql
+
+      # MySQL connection — 'mysql' resolves to the service container above.
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ${MYSQL_APP_USER:-ecom_app}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecomdb_phase6}
+      LOG_DATABASE: ${LOG_DATABASE:-ecomdb_phase6_log}
+
+      # Application secrets.
+      secret_key: ${SECRET_KEY}
+      admin_username: ${ADMIN_USERNAME:-admin}
+      admin_password: ${ADMIN_PASSWORD}
+      admin_email: ${ADMIN_EMAIL:-admin@paultrades.com}
+      package_option: ${PACKAGE_OPTION:-prod}
+
+      # MSG91 OTP delivery (leave blank to disable SMS in non-prod).
+      MSG91_AUTHKEY: ${MSG91_AUTHKEY:-}
+      MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
+      MSG91_SENDER_ID: ${MSG91_SENDER_ID:-AIESHP}
+    ports:
+      - "${BACKEND_PORT:-7999}:${BACKEND_INTERNAL_PORT:-8000}"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.getenv('PORT', '8000'))\""
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── React frontend (nginx) ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ..
+      dockerfile: deployment/frontend.Dockerfile
+      args:
+        # /api is proxied to the backend service by nginx.conf.
+        REACT_APP_API_URL: ${FRONTEND_API_URL:-/api}
+        PACKAGE_OPTION: ${PACKAGE_OPTION:-prod}
+    container_name: econsite-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "wget --quiet --spider http://127.0.0.1:8080/ || exit 1"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mysql_data:
+    name: econsite_mysql_data
