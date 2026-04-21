@@ -21,7 +21,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     try {
       const result = await authService.login(username, password);
       onLoginSuccess();
-      if (result?.user?.role === 'user') {
+      if (result?.user?.role === 'admin' || result?.user?.role === 'business') {
+        navigate('/admin', { replace: true });
+      } else if (result?.user?.role === 'user') {
         navigate('/profile', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });

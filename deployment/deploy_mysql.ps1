@@ -60,6 +60,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 $RepoRoot    = Split-Path -Parent $PSScriptRoot
 $DeployDir   = $PSScriptRoot
 $ComposeFile = Join-Path $DeployDir 'docker-compose.mysql.yml'
+$EdgeComposeFile = Join-Path $DeployDir 'docker-compose.edge.yml'
 
 if (-not $EnvFile) {
     $EnvFile = Join-Path $DeployDir '.env.mysql'
@@ -95,6 +96,14 @@ function Read-EnvFile([string]$Path) {
         }
     }
     return $cfg
+}
+
+function Resolve-HostPort([string]$Value, [string]$DefaultPort) {
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $DefaultPort
+    }
+    $segments = $Value.Split(':')
+    return $segments[$segments.Length - 1]
 }
 
 # Poll Docker inspect until the named container reports 'healthy' or times out.
@@ -144,6 +153,8 @@ Write-Ok "Env file: $EnvFile"
 
 # 1c. Parse env file
 $cfg = Read-EnvFile $EnvFile
+$PublicDomain = if ($cfg.ContainsKey('PUBLIC_DOMAIN')) { $cfg['PUBLIC_DOMAIN'] } else { '' }
+$AcmeEmail    = if ($cfg.ContainsKey('ACME_EMAIL')) { $cfg['ACME_EMAIL'] } else { '' }
 
 # 1d. Required vars must be present and not placeholder values
 $required = @(
@@ -168,9 +179,23 @@ if (-not (Test-Path $ComposeFile)) {
 }
 Write-Ok "Compose file: $ComposeFile"
 
+if ($PublicDomain) {
+    if (-not (Test-Path $EdgeComposeFile)) {
+        Write-Fail "Edge compose file not found: $EdgeComposeFile"
+    }
+    if ([string]::IsNullOrWhiteSpace($AcmeEmail)) {
+        Write-Fail "ACME_EMAIL is required when PUBLIC_DOMAIN is set in $EnvFile"
+    }
+    Write-Ok "Edge proxy enabled for domain: $PublicDomain"
+}
+
 # ─── Step 2: Build Docker images ──────────────────────────────────────────────
 
-$composeArgs = @('-f', $ComposeFile, '--env-file', $EnvFile)
+$composeArgs = if ($PublicDomain) {
+    @('-f', $ComposeFile, '-f', $EdgeComposeFile, '--env-file', $EnvFile)
+} else {
+    @('-f', $ComposeFile, '--env-file', $EnvFile)
+}
 
 if (-not $NoBuild) {
     Write-Step 'Step 2: Building Docker images (this may take several minutes)'
@@ -244,7 +269,7 @@ if ($LASTEXITCODE -ne 0) {
 if (-not $SkipSmoke) {
     Write-Step 'Step 7: Running API smoke tests'
 
-    $BackendPort = if ($cfg.ContainsKey('BACKEND_PORT')) { $cfg['BACKEND_PORT'] } else { '7999' }
+    $BackendPort = Resolve-HostPort -Value $(if ($cfg.ContainsKey('BACKEND_PORT')) { $cfg['BACKEND_PORT'] } else { '7999' }) -DefaultPort '7999'
     $BaseUrl     = "http://localhost:$BackendPort"
 
     # 7a. Health
@@ -271,17 +296,27 @@ if (-not $SkipSmoke) {
         Write-Fail "GET /api/products failed: $_"
     }
 
-    # 7c. Metrics — confirms DB_ENGINE=mysql
+    # 7c. Backend runtime config — confirms DB_ENGINE=mysql
     try {
-        $metrics = Invoke-RestMethod -Uri "$BaseUrl/api/metrics" -TimeoutSec 15
-        $engine  = $metrics.db_engine
+        $engine = docker exec econsite-backend python -c "from app.config import settings; print(settings.db_engine)" 2>$null
+        $engine = ($engine | Out-String).Trim()
         if ($engine -eq 'mysql') {
-            Write-Ok "GET /api/metrics -> db_engine=mysql confirmed"
+            Write-Ok "Backend runtime reports db_engine=mysql"
         } else {
-            Write-Fail "GET /api/metrics: expected db_engine=mysql, got '$engine'"
+            Write-Fail "Backend runtime config: expected db_engine=mysql, got '$engine'"
         }
     } catch {
-        Write-Warn "/api/metrics not available or returned unexpected format (non-blocking)"
+        Write-Warn "Unable to confirm DB_ENGINE via backend container runtime (non-blocking)"
+    }
+
+    if ($PublicDomain) {
+        try {
+            $edgeCheck = docker exec econsite-edge sh -c "wget --server-response --spider --header='Host: $PublicDomain' http://127.0.0.1/ 2>&1 | head -n 1"
+            Write-Ok "Edge host-header check completed for $PublicDomain"
+            Write-Host ($edgeCheck | Out-String)
+        } catch {
+            Write-Warn "Edge host-header check failed: $_"
+        }
     }
 } else {
     Write-Step 'Step 7: Skipping smoke tests (-SkipSmoke flag set)'
@@ -295,14 +330,18 @@ Push-Location $RepoRoot
 docker compose -f $ComposeFile --env-file $EnvFile ps
 Pop-Location
 
-$FrontendPort = if ($cfg.ContainsKey('FRONTEND_PORT')) { $cfg['FRONTEND_PORT'] } else { '3000' }
-$BackendPort  = if ($cfg.ContainsKey('BACKEND_PORT'))  { $cfg['BACKEND_PORT'] }  else { '7999' }
+$FrontendPort = Resolve-HostPort -Value $(if ($cfg.ContainsKey('FRONTEND_PORT')) { $cfg['FRONTEND_PORT'] } else { '3000' }) -DefaultPort '3000'
+$BackendPort  = Resolve-HostPort -Value $(if ($cfg.ContainsKey('BACKEND_PORT'))  { $cfg['BACKEND_PORT'] }  else { '7999' }) -DefaultPort '7999'
 
 Write-Host ''
 Write-Host '  Frontend  : ' -NoNewline
 Write-Host "http://localhost:$FrontendPort" -ForegroundColor Green
 Write-Host '  Backend   : ' -NoNewline
 Write-Host "http://localhost:$BackendPort" -ForegroundColor Green
+if ($PublicDomain) {
+    Write-Host '  Public URL: ' -NoNewline
+    Write-Host "https://$PublicDomain" -ForegroundColor Green
+}
 Write-Host '  DB engine : mysql (ecomdb_phase6)' -ForegroundColor Green
 Write-Host ''
 Write-Host '  Day-to-day operations:'

@@ -46,6 +46,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot    = Split-Path -Parent $PSScriptRoot
 $ComposeFile = Join-Path $PSScriptRoot 'docker-compose.mysql.yml'
+$EdgeComposeFile = Join-Path $PSScriptRoot 'docker-compose.edge.yml'
 $EnvFile     = Join-Path $PSScriptRoot '.env.mysql'
 
 if (-not (Test-Path $EnvFile)) {
@@ -67,6 +68,10 @@ function Read-EnvVar([string]$Path, [string]$Key) {
 }
 
 $composeArgs = @('-f', $ComposeFile, '--env-file', $EnvFile)
+$publicDomain = Read-EnvVar $EnvFile 'PUBLIC_DOMAIN'
+if ($publicDomain) {
+    $composeArgs = @('-f', $ComposeFile, '-f', $EdgeComposeFile, '--env-file', $EnvFile)
+}
 
 Push-Location $RepoRoot
 try {
@@ -121,6 +126,13 @@ print(resp.read().decode())
                 Write-Host 'mysqld is alive' -ForegroundColor Green
             } else {
                 Write-Host 'MySQL ping failed' -ForegroundColor Red
+            }
+
+            if ($publicDomain) {
+                Write-Host ''
+                Write-Host '── Edge HTTP host-header check ───────────────────────────' -ForegroundColor Cyan
+                $edgeStatus = docker compose @composeArgs exec edge sh -c "wget --server-response --spider --header='Host: $publicDomain' http://127.0.0.1/ 2>&1 | head -n 1"
+                Write-Host ($edgeStatus | Out-String)
             }
         }
     }

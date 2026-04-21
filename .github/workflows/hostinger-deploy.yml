@@ -1,0 +1,90 @@
+name: Hostinger Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      no_build:
+        description: Skip Docker image build and reuse existing images on the VPS
+        required: false
+        default: false
+        type: boolean
+      skip_smoke:
+        description: Skip HTTP smoke tests after deployment
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/hostinger-deploy.yml
+      - backend/**
+      - deployment/**
+      - frontend/**
+
+concurrency:
+  group: hostinger-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+
+      - name: Trust VPS host key
+        env:
+          HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOSTINGER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy to Hostinger
+        env:
+          HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
+          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_ENV_MYSQL: ${{ secrets.HOSTINGER_ENV_MYSQL }}
+          HOSTINGER_DEPLOY_PATH: ${{ vars.HOSTINGER_DEPLOY_PATH }}
+          REPOSITORY_SLUG: ${{ github.repository }}
+          INPUT_NO_BUILD: ${{ github.event.inputs.no_build || 'false' }}
+          INPUT_SKIP_SMOKE: ${{ github.event.inputs.skip_smoke || 'false' }}
+        run: |
+          set -euo pipefail
+
+          remote_host="${HOSTINGER_USER}@${HOSTINGER_HOST}"
+          remote_path="${HOSTINGER_DEPLOY_PATH:-/opt/pbsecom/PBSEcomWebAppLive}"
+          remote_base="$(dirname "$remote_path")"
+          remote_branch="main"
+
+          if [[ -z "${HOSTINGER_ENV_MYSQL}" ]]; then
+            echo "HOSTINGER_ENV_MYSQL secret is empty." >&2
+            exit 1
+          fi
+
+          ssh "$remote_host" "set -euo pipefail
+            mkdir -p '$remote_base'
+            if [ ! -d '$remote_path/.git' ]; then
+              git clone --branch '$remote_branch' --depth 1 'https://github.com/${REPOSITORY_SLUG}.git' '$remote_path'
+            else
+              git -C '$remote_path' fetch --prune origin
+              git -C '$remote_path' checkout '$remote_branch'
+              git -C '$remote_path' reset --hard 'origin/$remote_branch'
+            fi
+          "
+
+          printf '%s\n' "$HOSTINGER_ENV_MYSQL" | ssh "$remote_host" "cat > '$remote_path/deployment/.env.mysql' && chmod 600 '$remote_path/deployment/.env.mysql'"
+
+          deploy_flags=()
+          if [[ "$INPUT_NO_BUILD" == 'true' ]]; then
+            deploy_flags+=(--no-build)
+          fi
+          if [[ "$INPUT_SKIP_SMOKE" == 'true' ]]; then
+            deploy_flags+=(--skip-smoke)
+          fi
+
+          ssh "$remote_host" "cd '$remote_path' && bash deployment/deploy_mysql.sh --env-file deployment/.env.mysql ${deploy_flags[*]}"

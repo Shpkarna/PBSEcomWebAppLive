@@ -25,6 +25,7 @@ services:
       MYSQL_APP_USER: ${MYSQL_APP_USER:-ecom_app}
       MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD}
       LOG_DATABASE: ${LOG_DATABASE:-ecomdb_phase6_log}
+      MYSQL_ONETIME_PASSWORD: ${MYSQL_ONETIME_PASSWORD:-}
     ports:
       # Default binds to loopback only (127.0.0.1:3306). Override
       # MYSQL_EXPOSED_PORT in .env.mysql if you need a different binding.
