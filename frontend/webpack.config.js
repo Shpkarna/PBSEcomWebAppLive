@@ -1,6 +1,32 @@
+const fs = require('fs');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
+
+class CopyPublicAssetsPlugin {
+  apply(compiler) {
+    compiler.hooks.afterEmit.tap('CopyPublicAssetsPlugin', () => {
+      const sourceDir = path.resolve(__dirname, 'public');
+      const outputDir = compiler.options.output.path;
+
+      if (!fs.existsSync(sourceDir) || !outputDir) {
+        return;
+      }
+
+      for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+        if (entry.name === 'index.html') {
+          continue;
+        }
+
+        fs.cpSync(
+          path.join(sourceDir, entry.name),
+          path.join(outputDir, entry.name),
+          { recursive: true, force: true }
+        );
+      }
+    });
+  }
+}
 
 module.exports = (env, argv) => {
   const packageOption = env?.packageOption || process.env.PACKAGE_OPTION;
@@ -60,6 +86,7 @@ module.exports = (env, argv) => {
       new HtmlWebpackPlugin({
         template: './public/index.html',
       }),
+      new CopyPublicAssetsPlugin(),
       new webpack.DefinePlugin({
         'process.env.PACKAGE_OPTION': JSON.stringify(packageOption || 'sandbox'),
         'process.env.REACT_APP_API_URL': JSON.stringify(process.env.REACT_APP_API_URL || '/api'),
