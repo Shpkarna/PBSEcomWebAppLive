@@ -4,6 +4,7 @@ import { AdminLayout } from './components/AdminLayout';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { GuestComingSoonWrapper } from './components/GuestComingSoonWrapper';
 import { authService, User } from './services/authService';
 import {
   loadCompanyImage,
@@ -136,11 +137,19 @@ const App: React.FC = () => {
         <Suspense fallback={<div style={{ textAlign: 'center', padding: '50px' }}>Loading page...</div>}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/products" element={<HomePage />} />
+            <Route path="/products" element={
+              <GuestComingSoonWrapper>
+                <HomePage />
+              </GuestComingSoonWrapper>
+            } />
             <Route path="/products/:productId" element={<ProductDetailPage />} />
             <Route path="/login" element={<LoginPage onLoginSuccess={handleLoginSuccess} />} />
             <Route path="/register" element={<RegisterPage onRegisterSuccess={handleLoginSuccess} />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={
+              <GuestComingSoonWrapper>
+                <DashboardPage />
+              </GuestComingSoonWrapper>
+            } />
             <Route path="/profile" element={
               <ProtectedRoute requiredFunctionality="user_profile">
                 <ProfilePage />
